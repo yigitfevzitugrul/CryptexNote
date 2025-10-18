@@ -1,0 +1,19 @@
+# Sanal Ortam (Virtual Environment)
+.venv/
+venv/
+ENV/
+
+# Python cache dosyaları
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyInstaller'ın oluşturduğu dosyalar
+/dist/
+/build/
+*.spec
+
+# IDE ve Editör dosyaları (İsteğe bağlı)
+.idea/
+.vscode/
