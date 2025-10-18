@@ -21,7 +21,7 @@ Bu uygulamayı kullanmanın iki yolu vardır:
 
 Programı Python kurmadan direkt çalıştırmak için:
 1.  Projenin [**Releases**](https://github.com/yigitfevzitugrul/CryptexNote/releases) sayfasına gidin.
-2.  En son sürümün altındaki `CryptexNote-v0.1.zip` dosyasını indirin.
+2.  En son sürümün altındaki `CryptexNote-v1.0.zip` dosyasını indirin.
 3.  Arşivden çıkardığınız klasördeki `main.exe` dosyasına çift tıklayarak uygulamayı başlatın.
 
 ### 2. Geliştiriciler İçin (Kaynak Koddan Çalıştırma)
