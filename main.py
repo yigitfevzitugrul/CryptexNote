@@ -12,7 +12,6 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 def resource_path(relative_path):
     """ Hem normal hem de PyInstaller .exe'si olarak çalışırken dosya yolunu doğru verir. """
     try:
-        # PyInstaller geçici bir yol oluşturur ve bunu _MEIPASS içinde saklar.
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
