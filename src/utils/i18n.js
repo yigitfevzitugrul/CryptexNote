@@ -100,7 +100,14 @@ export const translations = {
         sizeSmall: 'Küçük',
         sizeNormal: 'Normal',
         sizeLarge: 'Büyük',
-        sizeHuge: 'Çok büyük'
+        sizeHuge: 'Çok büyük',
+        readMode: 'Oku',
+        editMode: 'Düzenle',
+        modeSwitch: 'Görünüm modu',
+        readingModeStatus: 'Okuma modu',
+        editingModeStatus: 'Düzenleme modu',
+        unsaved: 'kaydedilmemiş değişiklik var',
+        emptyNoteRead: 'Bu not henüz boş. Yazmaya başlamak için Düzenle\'ye bas.'
     },
     en: {
         notes: 'My Notes',
@@ -203,6 +210,13 @@ export const translations = {
         sizeSmall: 'Small',
         sizeNormal: 'Normal',
         sizeLarge: 'Large',
-        sizeHuge: 'Huge'
+        sizeHuge: 'Huge',
+        readMode: 'Read',
+        editMode: 'Edit',
+        modeSwitch: 'View mode',
+        readingModeStatus: 'Reading mode',
+        editingModeStatus: 'Editing mode',
+        unsaved: 'unsaved changes',
+        emptyNoteRead: 'This note is empty. Press Edit to start writing.'
     }
 };

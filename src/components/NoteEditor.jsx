@@ -57,6 +57,9 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
     const [textColor, setTextColor] = useState('#d97706');
     const [highlightColor, setHighlightColor] = useState('#fef08a');
     const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false, strikeThrough: false });
+    // Mevcut notlar okuma modunda, yeni notlar düzenleme modunda açılır
+    const [isReading, setIsReading] = useState(!!initialData);
+    const [isDirty, setIsDirty] = useState(false);
     const editorRef = useRef(null);
     const colorPickerRef = useRef(null);
     const highlightPickerRef = useRef(null);
@@ -86,10 +89,19 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
         if (editorRef.current) {
             editorRef.current.innerHTML = initialData?.content || '';
             updateCounts();
-            editorRef.current.focus();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Düzenleme moduna geçince yazı alanına odaklan, okuma modunda renk panellerini kapat
+    useEffect(() => {
+        if (isReading) {
+            setShowColorPicker(false);
+            setShowHighlightPicker(false);
+        } else {
+            editorRef.current?.focus();
+        }
+    }, [isReading]);
 
     // Close pickers on outside click
     useEffect(() => {
@@ -108,6 +120,7 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
     const execCmd = (cmd, value = null) => {
         editorRef.current?.focus();
         document.execCommand(cmd, false, value);
+        setIsDirty(true);
         updateActiveFormats();
         updateCounts();
     };
@@ -134,6 +147,23 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
         if (e.key === 'Enter') { e.preventDefault(); editorRef.current?.focus(); }
     };
 
+    // Ctrl+E: mod değiştir. Ctrl+S yazı alanında/başlıkta işlenmediyse (ör. okuma modu) burada yakalanır.
+    useEffect(() => {
+        const handleGlobalKey = (e) => {
+            if (!e.ctrlKey || e.defaultPrevented) return;
+            const key = e.key.toLowerCase();
+            if (key === 'e') {
+                e.preventDefault();
+                setIsReading(r => !r);
+            } else if (key === 's') {
+                e.preventDefault();
+                if (!isReading || isDirty) handleSave();
+            }
+        };
+        document.addEventListener('keydown', handleGlobalKey);
+        return () => document.removeEventListener('keydown', handleGlobalKey);
+    });
+
     return (
         <div className="editor-screen">
             {/* ── TOP BAR ── */}
@@ -144,9 +174,31 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                         {t.back}
                     </button>
                     <div className="topbar-divider" />
-                    <span className="pill editor-mode-label">
-                        {initialData ? t.editing : t.newEntry}
-                    </span>
+                    <div className="mode-switch" role="group" aria-label={`${t.modeSwitch} (Ctrl+E)`}>
+                        <button
+                            type="button"
+                            className={`mode-switch-btn ${isReading ? 'active' : ''}`}
+                            aria-pressed={isReading}
+                            onClick={() => setIsReading(true)}
+                            title={`${t.readMode} (Ctrl+E)`}
+                        >
+                            <Icon name="book" size={16} />
+                            <span className="mode-switch-label">{t.readMode}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className={`mode-switch-btn ${!isReading ? 'active' : ''}`}
+                            aria-pressed={!isReading}
+                            onClick={() => setIsReading(false)}
+                            title={`${t.editMode} (Ctrl+E)`}
+                        >
+                            <Icon name="pencil" size={16} />
+                            <span className="mode-switch-label">{t.editMode}</span>
+                        </button>
+                    </div>
+                    {!initialData && (
+                        <span className="pill editor-mode-label">{t.newEntry}</span>
+                    )}
                 </div>
                 <div className="editor-topbar-right">
                     {onToggleFullscreen && (
@@ -166,196 +218,210 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                             {t.delete}
                         </button>
                     )}
-                    <button type="button" className="btn btn-primary" onClick={handleSave}>
-                        <Icon name="lock" size={15} />
-                        {t.save}
-                    </button>
+                    {(!isReading || isDirty) && (
+                        <button type="button" className="btn btn-primary" onClick={handleSave}>
+                            <Icon name="lock" size={15} />
+                            {t.save}
+                        </button>
+                    )}
                 </div>
             </header>
 
-            {/* ── TOOLBAR ── */}
-            <div className="editor-toolbar clay" role="toolbar" aria-label={t.editNote}>
-                <ToolbarBtn onClick={() => execCmd('bold')} title={`${t.bold} (Ctrl+B)`} active={activeFormats.bold}>
-                    <strong className="toolbar-glyph">B</strong>
-                </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('italic')} title={`${t.italic} (Ctrl+I)`} active={activeFormats.italic}>
-                    <em className="toolbar-glyph">I</em>
-                </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('underline')} title={`${t.underline} (Ctrl+U)`} active={activeFormats.underline}>
-                    <span className="toolbar-glyph" style={{ textDecoration: 'underline' }}>U</span>
-                </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('strikeThrough')} title={t.strike} active={activeFormats.strikeThrough}>
-                    <span className="toolbar-glyph" style={{ textDecoration: 'line-through' }}>S</span>
-                </ToolbarBtn>
-
-                <div className="toolbar-separator" />
-
-                <select
-                    className="toolbar-select"
-                    title={t.fontSize}
-                    aria-label={t.fontSize}
-                    onChange={e => execCmd('fontSize', e.target.value)}
-                    defaultValue="3"
-                    onMouseDown={e => e.stopPropagation()}
-                >
-                    {FONT_SIZES.map(s => (
-                        <option key={s.value} value={s.value}>{t[s.key]}</option>
-                    ))}
-                </select>
-
-                <div className="toolbar-separator" />
-
-                <ToolbarBtn onClick={() => execCmd('justifyLeft')} title={t.alignLeft}>
-                    <Icon name="alignLeft" size={16} />
-                </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('justifyCenter')} title={t.alignCenter}>
-                    <Icon name="alignCenter" size={16} />
-                </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('justifyRight')} title={t.alignRight}>
-                    <Icon name="alignRight" size={16} />
-                </ToolbarBtn>
-
-                <div className="toolbar-separator" />
-
-                <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title={t.bulletList}>
-                    <Icon name="list" size={16} />
-                </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title={t.numberList}>
-                    <Icon name="listOrdered" size={16} />
-                </ToolbarBtn>
-
-                <div className="toolbar-separator" />
-
-                {/* Text Color */}
-                <div className="toolbar-color-wrap" ref={colorPickerRef}>
-                    <ToolbarBtn
-                        onClick={() => { setShowColorPicker(p => !p); setShowHighlightPicker(false); }}
-                        title={t.textColor}
-                        ariaExpanded={showColorPicker}
-                    >
-                        <span className="toolbar-color-icon">
-                            <span className="toolbar-glyph" style={{ fontWeight: 600 }}>A</span>
-                            <span className="toolbar-color-bar" style={{ background: textColor }} />
-                        </span>
+            {/* ── TOOLBAR (yalnızca düzenleme modunda) ── */}
+            {!isReading && (
+                <div className="editor-toolbar clay" role="toolbar" aria-label={t.editNote}>
+                    <ToolbarBtn onClick={() => execCmd('bold')} title={`${t.bold} (Ctrl+B)`} active={activeFormats.bold}>
+                        <strong className="toolbar-glyph">B</strong>
                     </ToolbarBtn>
-                    {showColorPicker && (
-                        <div className="color-picker-panel">
-                            <div className="eyebrow">{t.textColor}</div>
-                            <div className="color-picker-grid">
-                                {TEXT_COLORS.map(c => (
-                                    <button
-                                        key={c.value}
-                                        type="button"
-                                        className="color-swatch"
-                                        style={{ background: c.value }}
-                                        title={c.label}
-                                        aria-label={c.label}
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            execCmd('foreColor', c.value);
-                                            setTextColor(c.value);
-                                            setShowColorPicker(false);
-                                        }}
-                                    />
-                                ))}
+                    <ToolbarBtn onClick={() => execCmd('italic')} title={`${t.italic} (Ctrl+I)`} active={activeFormats.italic}>
+                        <em className="toolbar-glyph">I</em>
+                    </ToolbarBtn>
+                    <ToolbarBtn onClick={() => execCmd('underline')} title={`${t.underline} (Ctrl+U)`} active={activeFormats.underline}>
+                        <span className="toolbar-glyph" style={{ textDecoration: 'underline' }}>U</span>
+                    </ToolbarBtn>
+                    <ToolbarBtn onClick={() => execCmd('strikeThrough')} title={t.strike} active={activeFormats.strikeThrough}>
+                        <span className="toolbar-glyph" style={{ textDecoration: 'line-through' }}>S</span>
+                    </ToolbarBtn>
+
+                    <div className="toolbar-separator" />
+
+                    <select
+                        className="toolbar-select"
+                        title={t.fontSize}
+                        aria-label={t.fontSize}
+                        onChange={e => execCmd('fontSize', e.target.value)}
+                        defaultValue="3"
+                        onMouseDown={e => e.stopPropagation()}
+                    >
+                        {FONT_SIZES.map(s => (
+                            <option key={s.value} value={s.value}>{t[s.key]}</option>
+                        ))}
+                    </select>
+
+                    <div className="toolbar-separator" />
+
+                    <ToolbarBtn onClick={() => execCmd('justifyLeft')} title={t.alignLeft}>
+                        <Icon name="alignLeft" size={16} />
+                    </ToolbarBtn>
+                    <ToolbarBtn onClick={() => execCmd('justifyCenter')} title={t.alignCenter}>
+                        <Icon name="alignCenter" size={16} />
+                    </ToolbarBtn>
+                    <ToolbarBtn onClick={() => execCmd('justifyRight')} title={t.alignRight}>
+                        <Icon name="alignRight" size={16} />
+                    </ToolbarBtn>
+
+                    <div className="toolbar-separator" />
+
+                    <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title={t.bulletList}>
+                        <Icon name="list" size={16} />
+                    </ToolbarBtn>
+                    <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title={t.numberList}>
+                        <Icon name="listOrdered" size={16} />
+                    </ToolbarBtn>
+
+                    <div className="toolbar-separator" />
+
+                    {/* Text Color */}
+                    <div className="toolbar-color-wrap" ref={colorPickerRef}>
+                        <ToolbarBtn
+                            onClick={() => { setShowColorPicker(p => !p); setShowHighlightPicker(false); }}
+                            title={t.textColor}
+                            ariaExpanded={showColorPicker}
+                        >
+                            <span className="toolbar-color-icon">
+                                <span className="toolbar-glyph" style={{ fontWeight: 600 }}>A</span>
+                                <span className="toolbar-color-bar" style={{ background: textColor }} />
+                            </span>
+                        </ToolbarBtn>
+                        {showColorPicker && (
+                            <div className="color-picker-panel">
+                                <div className="eyebrow">{t.textColor}</div>
+                                <div className="color-picker-grid">
+                                    {TEXT_COLORS.map(c => (
+                                        <button
+                                            key={c.value}
+                                            type="button"
+                                            className="color-swatch"
+                                            style={{ background: c.value }}
+                                            title={c.label}
+                                            aria-label={c.label}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                execCmd('foreColor', c.value);
+                                                setTextColor(c.value);
+                                                setShowColorPicker(false);
+                                            }}
+                                        />
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
 
-                {/* Highlight / Background Color */}
-                <div className="toolbar-color-wrap" ref={highlightPickerRef}>
-                    <ToolbarBtn
-                        onClick={() => { setShowHighlightPicker(p => !p); setShowColorPicker(false); }}
-                        title={t.highlight}
-                        ariaExpanded={showHighlightPicker}
-                    >
-                        <span className="toolbar-color-icon">
-                            <Icon name="highlighter" size={15} />
-                            <span className="toolbar-color-bar" style={{ background: highlightColor }} />
-                        </span>
-                    </ToolbarBtn>
-                    {showHighlightPicker && (
-                        <div className="color-picker-panel">
-                            <div className="eyebrow">{t.highlight}</div>
-                            <div className="color-picker-grid">
-                                {HIGHLIGHT_COLORS.map(c => (
+                    {/* Highlight / Background Color */}
+                    <div className="toolbar-color-wrap" ref={highlightPickerRef}>
+                        <ToolbarBtn
+                            onClick={() => { setShowHighlightPicker(p => !p); setShowColorPicker(false); }}
+                            title={t.highlight}
+                            ariaExpanded={showHighlightPicker}
+                        >
+                            <span className="toolbar-color-icon">
+                                <Icon name="highlighter" size={15} />
+                                <span className="toolbar-color-bar" style={{ background: highlightColor }} />
+                            </span>
+                        </ToolbarBtn>
+                        {showHighlightPicker && (
+                            <div className="color-picker-panel">
+                                <div className="eyebrow">{t.highlight}</div>
+                                <div className="color-picker-grid">
+                                    {HIGHLIGHT_COLORS.map(c => (
+                                        <button
+                                            key={c.value}
+                                            type="button"
+                                            className="color-swatch"
+                                            style={{ background: c.value }}
+                                            title={c.label}
+                                            aria-label={c.label}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                execCmd('hiliteColor', c.value);
+                                                setHighlightColor(c.value);
+                                                setShowHighlightPicker(false);
+                                            }}
+                                        />
+                                    ))}
                                     <button
-                                        key={c.value}
                                         type="button"
-                                        className="color-swatch"
-                                        style={{ background: c.value }}
-                                        title={c.label}
-                                        aria-label={c.label}
+                                        className="color-swatch color-swatch-none"
+                                        title={t.removeHighlight}
+                                        aria-label={t.removeHighlight}
                                         onMouseDown={(e) => {
                                             e.preventDefault();
-                                            execCmd('hiliteColor', c.value);
-                                            setHighlightColor(c.value);
+                                            execCmd('hiliteColor', 'transparent');
                                             setShowHighlightPicker(false);
                                         }}
-                                    />
-                                ))}
-                                <button
-                                    type="button"
-                                    className="color-swatch color-swatch-none"
-                                    title={t.removeHighlight}
-                                    aria-label={t.removeHighlight}
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        execCmd('hiliteColor', 'transparent');
-                                        setShowHighlightPicker(false);
-                                    }}
-                                >
-                                    <Icon name="x" size={13} strokeWidth={2.4} />
-                                </button>
+                                    >
+                                        <Icon name="x" size={13} strokeWidth={2.4} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+
+                    <div className="toolbar-separator" />
+
+                    <ToolbarBtn onClick={() => execCmd('removeFormat')} title={t.clearFormat}>
+                        <Icon name="eraser" size={16} />
+                    </ToolbarBtn>
+
+                    <div className="toolbar-hints" aria-hidden="true">
+                        <span><kbd className="kbd">Ctrl+B</kbd>{t.bold}</span>
+                        <span><kbd className="kbd">Ctrl+I</kbd>{t.italic}</span>
+                        <span><kbd className="kbd">Ctrl+S</kbd>{t.save}</span>
+                        <span><kbd className="kbd">Ctrl+E</kbd>{t.readMode}</span>
+                    </div>
                 </div>
-
-                <div className="toolbar-separator" />
-
-                <ToolbarBtn onClick={() => execCmd('removeFormat')} title={t.clearFormat}>
-                    <Icon name="eraser" size={16} />
-                </ToolbarBtn>
-
-                <div className="toolbar-hints" aria-hidden="true">
-                    <span><kbd className="kbd">Ctrl+B</kbd>{t.bold}</span>
-                    <span><kbd className="kbd">Ctrl+I</kbd>{t.italic}</span>
-                    <span><kbd className="kbd">Ctrl+S</kbd>{t.save}</span>
-                </div>
-            </div>
+            )}
 
             {/* ── EDITOR AREA ── */}
             <div className="editor-body">
-                <div className="editor-sheet clay">
+                <div className={`editor-sheet clay ${isReading ? 'is-reading' : ''}`}>
                     <span className="eyebrow">
                         {(initialData?.date ? new Date(initialData.date) : new Date())
                             .toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </span>
-                    <label htmlFor="note-title" className="visually-hidden">{t.titleInputPlaceholder}</label>
-                    <input
-                        id="note-title"
-                        type="text"
-                        className="editor-title-input"
-                        placeholder={t.titleInputPlaceholder}
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        onKeyDown={handleTitleKeyDown}
-                    />
+                    {isReading ? (
+                        <h1 className={`editor-title-input editor-title-read ${title ? '' : 'untitled'}`}>
+                            {title || t.untitled}
+                        </h1>
+                    ) : (
+                        <>
+                            <label htmlFor="note-title" className="visually-hidden">{t.titleInputPlaceholder}</label>
+                            <input
+                                id="note-title"
+                                type="text"
+                                className="editor-title-input"
+                                placeholder={t.titleInputPlaceholder}
+                                value={title}
+                                onChange={e => { setTitle(e.target.value); setIsDirty(true); }}
+                                onKeyDown={handleTitleKeyDown}
+                            />
+                        </>
+                    )}
                     <div
                         ref={editorRef}
                         className="editor-content"
-                        contentEditable
+                        contentEditable={!isReading}
                         suppressContentEditableWarning
                         role="textbox"
                         aria-multiline="true"
+                        aria-readonly={isReading}
                         aria-label={t.contentPlaceholder}
-                        onInput={updateCounts}
+                        onInput={() => { updateCounts(); setIsDirty(true); }}
                         onKeyUp={updateActiveFormats}
                         onMouseUp={updateActiveFormats}
                         onKeyDown={handleKeyDown}
-                        data-placeholder={t.editorPlaceholder}
+                        data-placeholder={isReading ? t.emptyNoteRead : t.editorPlaceholder}
                     />
                 </div>
             </div>
@@ -364,8 +430,9 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
             <footer className="editor-statusbar eyebrow">
                 <div className="editor-status-info">
                     <span className="editor-status-item">
-                        <span className="editor-status-dot" aria-hidden="true" />
-                        {t.ready}
+                        <span className={`editor-status-dot ${isDirty ? 'dirty' : ''}`} aria-hidden="true" />
+                        {isReading ? t.readingModeStatus : t.editingModeStatus}
+                        {isDirty && ` · ${t.unsaved}`}
                     </span>
                     <span className="editor-status-item">{wordCount} {t.words}</span>
                     <span className="editor-status-item">{charCount} {t.chars}</span>
