@@ -35,7 +35,7 @@ function createWindow() {
         },
         autoHideMenuBar: true,
         // Arka plan rengi hemen göster — beyaz flash olmaz
-        backgroundColor: '#070b14',
+        backgroundColor: '#FFF9F5',
         // Frame özelleştirme
         frame: true,
         titleBarStyle: 'default',

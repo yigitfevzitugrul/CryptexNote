@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { translations } from '../utils/i18n';
+import Icon from './Icon';
 
 const TEXT_COLORS = [
     { label: 'Kırmızı', value: '#ef4444' },
@@ -24,11 +25,28 @@ const HIGHLIGHT_COLORS = [
 ];
 
 const FONT_SIZES = [
-    { label: 'Küçük', value: '1' },
-    { label: 'Normal', value: '3' },
-    { label: 'Büyük', value: '5' },
-    { label: 'Çok Büyük', value: '7' },
+    { key: 'sizeSmall', value: '1' },
+    { key: 'sizeNormal', value: '3' },
+    { key: 'sizeLarge', value: '5' },
+    { key: 'sizeHuge', value: '7' },
 ];
+
+function ToolbarBtn({ onClick, title: tip, active, children, ariaExpanded }) {
+    return (
+        <button
+            type="button"
+            className={`toolbar-btn ${active ? 'toolbar-btn-active' : ''}`}
+            onClick={onClick}
+            title={tip}
+            aria-label={tip}
+            aria-pressed={active === undefined ? undefined : active}
+            aria-expanded={ariaExpanded}
+            onMouseDown={(e) => e.preventDefault()} // Prevent editor losing focus
+        >
+            {children}
+        </button>
+    );
+}
 
 export default function NoteEditor({ initialData, onSave, onCancel, onDelete, lang = 'tr', isFullscreen, onToggleFullscreen }) {
     const [title, setTitle] = useState(initialData?.title || '');
@@ -36,34 +54,14 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
     const [charCount, setCharCount] = useState(0);
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+    const [textColor, setTextColor] = useState('#d97706');
+    const [highlightColor, setHighlightColor] = useState('#fef08a');
     const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false, strikeThrough: false });
     const editorRef = useRef(null);
     const colorPickerRef = useRef(null);
     const highlightPickerRef = useRef(null);
-    const t = translations[lang];
-
-    // Set initial content
-    useEffect(() => {
-        if (editorRef.current) {
-            editorRef.current.innerHTML = initialData?.content || '';
-            updateCounts();
-            editorRef.current.focus();
-        }
-    }, []);
-
-    // Close pickers on outside click
-    useEffect(() => {
-        const handleClick = (e) => {
-            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
-                setShowColorPicker(false);
-            }
-            if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target)) {
-                setShowHighlightPicker(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
+    const t = translations[lang] || translations.tr;
+    const locale = lang === 'tr' ? 'tr-TR' : 'en-US';
 
     const updateCounts = () => {
         if (editorRef.current) {
@@ -82,6 +80,30 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
             strikeThrough: document.queryCommandState('strikeThrough'),
         });
     };
+
+    // Set initial content
+    useEffect(() => {
+        if (editorRef.current) {
+            editorRef.current.innerHTML = initialData?.content || '';
+            updateCounts();
+            editorRef.current.focus();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Close pickers on outside click
+    useEffect(() => {
+        const handleClick = (e) => {
+            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+                setShowColorPicker(false);
+            }
+            if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target)) {
+                setShowHighlightPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
 
     const execCmd = (cmd, value = null) => {
         editorRef.current?.focus();
@@ -106,173 +128,100 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
         if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSave(); }
     };
 
-    const ToolbarBtn = ({ onClick, title: tip, active, children, style }) => (
-        <button
-            type="button"
-            className={`toolbar-btn ${active ? 'toolbar-btn-active' : ''}`}
-            onClick={onClick}
-            title={tip}
-            style={style}
-            onMouseDown={(e) => e.preventDefault()} // Prevent editor losing focus
-        >
-            {children}
-        </button>
-    );
+    // Başlık alanında da Ctrl+S kaydetsin, Enter yazı alanına geçsin
+    const handleTitleKeyDown = (e) => {
+        if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSave(); }
+        if (e.key === 'Enter') { e.preventDefault(); editorRef.current?.focus(); }
+    };
 
     return (
         <div className="editor-screen">
             {/* ── TOP BAR ── */}
-            <div className="editor-topbar">
+            <header className="editor-topbar clay">
                 <div className="editor-topbar-left">
-                    <button
-                        type="button"
-                        className="btn btn-ghost"
-                        onClick={onCancel}
-                        style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem', flexShrink: 0 }}
-                    >
-                        ← {t.cancel}
+                    <button type="button" className="btn btn-ghost" onClick={onCancel} title={t.cancel}>
+                        <Icon name="arrowLeft" size={16} />
+                        {t.back}
                     </button>
-                    <div style={{ width: '1px', height: '24px', background: 'var(--border-color)', flexShrink: 0 }} />
-                    <span className="editor-label" style={{ flexShrink: 0 }}>
-                        {initialData ? t.editNote : t.createNote}
+                    <div className="topbar-divider" />
+                    <span className="pill editor-mode-label">
+                        {initialData ? t.editing : t.newEntry}
                     </span>
-                    <input
-                        type="text"
-                        className="editor-title-input"
-                        placeholder="Başlık yaz..."
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                    />
                 </div>
                 <div className="editor-topbar-right">
-                    {/* Fullscreen toggle */}
                     {onToggleFullscreen && (
                         <button
                             type="button"
-                            className="btn btn-ghost"
+                            className="btn btn-ghost btn-icon"
                             onClick={onToggleFullscreen}
-                            title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran'}
-                            style={{ padding: '0.5rem 0.75rem' }}
+                            title={isFullscreen ? t.exitFullscreen : t.fullscreen}
+                            aria-label={isFullscreen ? t.exitFullscreen : t.fullscreen}
                         >
-                            {isFullscreen ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
-                                </svg>
-                            ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-                                </svg>
-                            )}
+                            <Icon name={isFullscreen ? 'minimize' : 'maximize'} size={17} />
                         </button>
                     )}
                     {onDelete && (
-                        <button
-                            type="button"
-                            className="btn btn-ghost"
-                            onClick={onDelete}
-                            style={{ color: 'var(--danger)', borderColor: 'rgba(255,71,87,0.3)', fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-                        >
-                            Sil
+                        <button type="button" className="btn btn-danger-ghost" onClick={onDelete}>
+                            <Icon name="trash" size={16} />
+                            {t.delete}
                         </button>
                     )}
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={handleSave}
-                        style={{ padding: '0.6rem 1.5rem' }}
-                    >
+                    <button type="button" className="btn btn-primary" onClick={handleSave}>
+                        <Icon name="lock" size={15} />
                         {t.save}
                     </button>
                 </div>
-            </div>
+            </header>
 
             {/* ── TOOLBAR ── */}
-            <div className="editor-toolbar">
-                {/* Bold */}
-                <ToolbarBtn onClick={() => execCmd('bold')} title="Kalın (Ctrl+B)" active={activeFormats.bold}>
-                    <strong>B</strong>
+            <div className="editor-toolbar clay" role="toolbar" aria-label={t.editNote}>
+                <ToolbarBtn onClick={() => execCmd('bold')} title={`${t.bold} (Ctrl+B)`} active={activeFormats.bold}>
+                    <strong className="toolbar-glyph">B</strong>
                 </ToolbarBtn>
-
-                {/* Italic */}
-                <ToolbarBtn onClick={() => execCmd('italic')} title="İtalik (Ctrl+I)" active={activeFormats.italic}>
-                    <em>İ</em>
+                <ToolbarBtn onClick={() => execCmd('italic')} title={`${t.italic} (Ctrl+I)`} active={activeFormats.italic}>
+                    <em className="toolbar-glyph">I</em>
                 </ToolbarBtn>
-
-                {/* Underline */}
-                <ToolbarBtn onClick={() => execCmd('underline')} title="Altı Çizili (Ctrl+U)" active={activeFormats.underline}>
-                    <span style={{ textDecoration: 'underline' }}>A</span>
+                <ToolbarBtn onClick={() => execCmd('underline')} title={`${t.underline} (Ctrl+U)`} active={activeFormats.underline}>
+                    <span className="toolbar-glyph" style={{ textDecoration: 'underline' }}>U</span>
                 </ToolbarBtn>
-
-                {/* Strikethrough */}
-                <ToolbarBtn onClick={() => execCmd('strikeThrough')} title="Üstü Çizili" active={activeFormats.strikeThrough}>
-                    <span style={{ textDecoration: 'line-through' }}>S</span>
+                <ToolbarBtn onClick={() => execCmd('strikeThrough')} title={t.strike} active={activeFormats.strikeThrough}>
+                    <span className="toolbar-glyph" style={{ textDecoration: 'line-through' }}>S</span>
                 </ToolbarBtn>
 
                 <div className="toolbar-separator" />
 
-                {/* Font Size */}
                 <select
                     className="toolbar-select"
-                    title="Yazı Boyutu"
+                    title={t.fontSize}
+                    aria-label={t.fontSize}
                     onChange={e => execCmd('fontSize', e.target.value)}
                     defaultValue="3"
                     onMouseDown={e => e.stopPropagation()}
                 >
                     {FONT_SIZES.map(s => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
+                        <option key={s.value} value={s.value}>{t[s.key]}</option>
                     ))}
                 </select>
 
                 <div className="toolbar-separator" />
 
-                {/* Text Align */}
-                <ToolbarBtn onClick={() => execCmd('justifyLeft')} title="Sola Hizala">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="17" y1="10" x2="3" y2="10"/>
-                        <line x1="21" y1="6" x2="3" y2="6"/>
-                        <line x1="21" y1="14" x2="3" y2="14"/>
-                        <line x1="17" y1="18" x2="3" y2="18"/>
-                    </svg>
+                <ToolbarBtn onClick={() => execCmd('justifyLeft')} title={t.alignLeft}>
+                    <Icon name="alignLeft" size={16} />
                 </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('justifyCenter')} title="Ortala">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="10" x2="6" y2="10"/>
-                        <line x1="21" y1="6" x2="3" y2="6"/>
-                        <line x1="21" y1="14" x2="3" y2="14"/>
-                        <line x1="18" y1="18" x2="6" y2="18"/>
-                    </svg>
+                <ToolbarBtn onClick={() => execCmd('justifyCenter')} title={t.alignCenter}>
+                    <Icon name="alignCenter" size={16} />
                 </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('justifyRight')} title="Sağa Hizala">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="21" y1="10" x2="7" y2="10"/>
-                        <line x1="21" y1="6" x2="3" y2="6"/>
-                        <line x1="21" y1="14" x2="3" y2="14"/>
-                        <line x1="21" y1="18" x2="7" y2="18"/>
-                    </svg>
+                <ToolbarBtn onClick={() => execCmd('justifyRight')} title={t.alignRight}>
+                    <Icon name="alignRight" size={16} />
                 </ToolbarBtn>
 
                 <div className="toolbar-separator" />
 
-                {/* Lists */}
-                <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title="Madde İşaretli Liste">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="8" y1="6" x2="21" y2="6"/>
-                        <line x1="8" y1="12" x2="21" y2="12"/>
-                        <line x1="8" y1="18" x2="21" y2="18"/>
-                        <line x1="3" y1="6" x2="3.01" y2="6"/>
-                        <line x1="3" y1="12" x2="3.01" y2="12"/>
-                        <line x1="3" y1="18" x2="3.01" y2="18"/>
-                    </svg>
+                <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title={t.bulletList}>
+                    <Icon name="list" size={16} />
                 </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title="Numaralı Liste">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="10" y1="6" x2="21" y2="6"/>
-                        <line x1="10" y1="12" x2="21" y2="12"/>
-                        <line x1="10" y1="18" x2="21" y2="18"/>
-                        <path d="M4 6h1v4"/>
-                        <path d="M4 10h2"/>
-                        <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>
-                    </svg>
+                <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title={t.numberList}>
+                    <Icon name="listOrdered" size={16} />
                 </ToolbarBtn>
 
                 <div className="toolbar-separator" />
@@ -281,16 +230,17 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                 <div className="toolbar-color-wrap" ref={colorPickerRef}>
                     <ToolbarBtn
                         onClick={() => { setShowColorPicker(p => !p); setShowHighlightPicker(false); }}
-                        title="Yazı Rengi"
+                        title={t.textColor}
+                        ariaExpanded={showColorPicker}
                     >
                         <span className="toolbar-color-icon">
-                            <span style={{ fontWeight: 700, fontSize: '1rem' }}>A</span>
-                            <span className="toolbar-color-bar" id="text-color-bar" style={{ background: '#6c63ff' }} />
+                            <span className="toolbar-glyph" style={{ fontWeight: 600 }}>A</span>
+                            <span className="toolbar-color-bar" style={{ background: textColor }} />
                         </span>
                     </ToolbarBtn>
                     {showColorPicker && (
                         <div className="color-picker-panel">
-                            <div className="color-picker-label">Yazı Rengi</div>
+                            <div className="eyebrow">{t.textColor}</div>
                             <div className="color-picker-grid">
                                 {TEXT_COLORS.map(c => (
                                     <button
@@ -299,12 +249,11 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                                         className="color-swatch"
                                         style={{ background: c.value }}
                                         title={c.label}
+                                        aria-label={c.label}
                                         onMouseDown={(e) => {
                                             e.preventDefault();
                                             execCmd('foreColor', c.value);
-                                            // Update indicator
-                                            const bar = document.getElementById('text-color-bar');
-                                            if (bar) bar.style.background = c.value;
+                                            setTextColor(c.value);
                                             setShowColorPicker(false);
                                         }}
                                     />
@@ -318,19 +267,17 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                 <div className="toolbar-color-wrap" ref={highlightPickerRef}>
                     <ToolbarBtn
                         onClick={() => { setShowHighlightPicker(p => !p); setShowColorPicker(false); }}
-                        title="Arka Plan Rengi (Vurgula)"
+                        title={t.highlight}
+                        ariaExpanded={showHighlightPicker}
                     >
                         <span className="toolbar-color-icon">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 20h9"/>
-                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                            </svg>
-                            <span className="toolbar-color-bar" id="highlight-color-bar" style={{ background: '#fef08a' }} />
+                            <Icon name="highlighter" size={15} />
+                            <span className="toolbar-color-bar" style={{ background: highlightColor }} />
                         </span>
                     </ToolbarBtn>
                     {showHighlightPicker && (
                         <div className="color-picker-panel">
-                            <div className="color-picker-label">Vurgu Rengi</div>
+                            <div className="eyebrow">{t.highlight}</div>
                             <div className="color-picker-grid">
                                 {HIGHLIGHT_COLORS.map(c => (
                                     <button
@@ -339,11 +286,11 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                                         className="color-swatch"
                                         style={{ background: c.value }}
                                         title={c.label}
+                                        aria-label={c.label}
                                         onMouseDown={(e) => {
                                             e.preventDefault();
                                             execCmd('hiliteColor', c.value);
-                                            const bar = document.getElementById('highlight-color-bar');
-                                            if (bar) bar.style.background = c.value;
+                                            setHighlightColor(c.value);
                                             setShowHighlightPicker(false);
                                         }}
                                     />
@@ -351,14 +298,15 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                                 <button
                                     type="button"
                                     className="color-swatch color-swatch-none"
-                                    title="Vurguyu Kaldır"
+                                    title={t.removeHighlight}
+                                    aria-label={t.removeHighlight}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         execCmd('hiliteColor', 'transparent');
                                         setShowHighlightPicker(false);
                                     }}
                                 >
-                                    ✕
+                                    <Icon name="x" size={13} strokeWidth={2.4} />
                                 </button>
                             </div>
                         </div>
@@ -367,74 +315,72 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
 
                 <div className="toolbar-separator" />
 
-                {/* Clear Formatting */}
-                <ToolbarBtn onClick={() => execCmd('removeFormat')} title="Biçimlendirmeyi Temizle">
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Tx</span>
+                <ToolbarBtn onClick={() => execCmd('removeFormat')} title={t.clearFormat}>
+                    <Icon name="eraser" size={16} />
                 </ToolbarBtn>
 
-                {/* Keyboard shortcuts hint */}
-                <div style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
-                    <span><kbd className="kbd">Ctrl+B</kbd> Kalın</span>
-                    <span><kbd className="kbd">Ctrl+I</kbd> İtalik</span>
-                    <span><kbd className="kbd">Ctrl+S</kbd> Kaydet</span>
+                <div className="toolbar-hints" aria-hidden="true">
+                    <span><kbd className="kbd">Ctrl+B</kbd>{t.bold}</span>
+                    <span><kbd className="kbd">Ctrl+I</kbd>{t.italic}</span>
+                    <span><kbd className="kbd">Ctrl+S</kbd>{t.save}</span>
                 </div>
             </div>
 
             {/* ── EDITOR AREA ── */}
             <div className="editor-body">
-                <div
-                    ref={editorRef}
-                    className="editor-content"
-                    contentEditable
-                    suppressContentEditableWarning
-                    onInput={updateCounts}
-                    onKeyUp={updateActiveFormats}
-                    onMouseUp={updateActiveFormats}
-                    onKeyDown={handleKeyDown}
-                    data-placeholder={"Notunu buraya yaz...\n\nMetni seçip üstteki araçlarla biçimlendirebilirsin."}
-                />
+                <div className="editor-sheet clay">
+                    <span className="eyebrow">
+                        {(initialData?.date ? new Date(initialData.date) : new Date())
+                            .toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                    <label htmlFor="note-title" className="visually-hidden">{t.titleInputPlaceholder}</label>
+                    <input
+                        id="note-title"
+                        type="text"
+                        className="editor-title-input"
+                        placeholder={t.titleInputPlaceholder}
+                        value={title}
+                        onChange={e => setTitle(e.target.value)}
+                        onKeyDown={handleTitleKeyDown}
+                    />
+                    <div
+                        ref={editorRef}
+                        className="editor-content"
+                        contentEditable
+                        suppressContentEditableWarning
+                        role="textbox"
+                        aria-multiline="true"
+                        aria-label={t.contentPlaceholder}
+                        onInput={updateCounts}
+                        onKeyUp={updateActiveFormats}
+                        onMouseUp={updateActiveFormats}
+                        onKeyDown={handleKeyDown}
+                        data-placeholder={t.editorPlaceholder}
+                    />
+                </div>
             </div>
 
             {/* ── STATUS BAR ── */}
-            <div className="editor-statusbar">
+            <footer className="editor-statusbar eyebrow">
                 <div className="editor-status-info">
-                    <div className="editor-status-item">
-                        <div className="editor-status-dot" />
-                        <span>Hazır</span>
-                    </div>
-                    <div className="editor-status-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                        </svg>
-                        <span>{wordCount} kelime</span>
-                    </div>
-                    <div className="editor-status-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="4 7 4 4 20 4 20 7"/>
-                            <line x1="9" y1="20" x2="15" y2="20"/>
-                            <line x1="12" y1="4" x2="12" y2="20"/>
-                        </svg>
-                        <span>{charCount} karakter</span>
-                    </div>
+                    <span className="editor-status-item">
+                        <span className="editor-status-dot" aria-hidden="true" />
+                        {t.ready}
+                    </span>
+                    <span className="editor-status-item">{wordCount} {t.words}</span>
+                    <span className="editor-status-item">{charCount} {t.chars}</span>
                     {initialData?.date && (
-                        <div className="editor-status-item">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                            <span>{new Date(initialData.date).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}</span>
-                        </div>
+                        <span className="editor-status-item">
+                            <Icon name="clock" size={12} />
+                            {new Date(initialData.date).toLocaleString(locale)}
+                        </span>
                     )}
                 </div>
-                <div className="editor-status-item">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                    <span>Uçtan uca şifreli</span>
-                </div>
-            </div>
+                <span className="editor-status-item sealed">
+                    <Icon name="lock" size={12} />
+                    AES-GCM 256
+                </span>
+            </footer>
         </div>
     );
 }

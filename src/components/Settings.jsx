@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
 import { translations } from '../utils/i18n';
+import Icon from './Icon';
 import { deriveKey, encryptData, decryptData } from '../utils/crypto';
 import { loadRawNotes, saveRawNotes, getAuthMetadata, saveAuthMetadata } from '../utils/storage';
 
+function CheckMark() {
+    return (
+        <span className="option-check" aria-hidden="true">
+            <Icon name="check" size={12} strokeWidth={3} />
+        </span>
+    );
+}
+
 export default function Settings({ lang, setLang, theme, setTheme, onPasswordChanged }) {
     const [currentTab, setCurrentTab] = useState('appearance');
-    const t = translations[lang];
+    const t = translations[lang] || translations.tr;
 
     // Password Change State
     const [currentPassword, setCurrentPassword] = useState('');
@@ -74,198 +83,199 @@ export default function Settings({ lang, setLang, theme, setTheme, onPasswordCha
     }
 
     const tabs = [
-        { id: 'appearance', label: t.appearance, icon: '🎨' },
-        { id: 'language', label: t.language, icon: '🌐' },
-        { id: 'security', label: t.changePassword, icon: '🔒' },
+        { id: 'appearance', label: t.appearance, icon: 'palette' },
+        { id: 'language', label: t.language, icon: 'globe' },
+        { id: 'security', label: t.changePassword, icon: 'key' },
     ];
 
     return (
         <div>
-            {/* Header */}
-            <div className="header-bar" style={{ marginBottom: '1.75rem' }}>
+            <header className="page-header">
                 <div>
-                    <h1 className="header-title">{t.settingsTitle}</h1>
-                    <p className="header-subtitle">Uygulama tercihlerini yönet</p>
+                    <span className="eyebrow">{t.settingsSubtitle}</span>
+                    <h1 className="page-title">{t.settingsTitle}</h1>
                 </div>
-            </div>
+            </header>
 
             <div className="settings-layout">
-                {/* Settings sidebar */}
-                <div className="settings-sidebar">
+                <nav className="settings-tabs clay" aria-label={t.settingsTitle}>
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
-                            className={`settings-tab ${currentTab === tab.id ? 'active' : ''}`}
+                            type="button"
+                            className={`nav-item ${currentTab === tab.id ? 'active' : ''}`}
                             onClick={() => setCurrentTab(tab.id)}
+                            aria-current={currentTab === tab.id ? 'true' : undefined}
                         >
-                            <span>{tab.icon}</span>
+                            <Icon name={tab.icon} size={17} />
                             {tab.label}
                         </button>
                     ))}
-                </div>
+                </nav>
 
-                {/* Settings content */}
-                <div className="settings-content">
+                <div className="settings-content clay" key={currentTab}>
 
                     {/* APPEARANCE TAB */}
                     {currentTab === 'appearance' && (
-                        <div>
-                            <div className="settings-section-title">🎨 {t.appearance}</div>
-                            <div className="settings-section-desc">
-                                Uygulama temasını kişiselleştir
-                            </div>
-                            <div className="option-grid">
+                        <section>
+                            <h2 className="settings-section-title">{t.appearance}</h2>
+                            <p className="settings-section-desc">{t.appearanceDesc}</p>
+                            <div className="option-grid" role="radiogroup" aria-label={t.appearance}>
                                 <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={theme === 'dark'}
                                     className={`option-card ${theme === 'dark' ? 'selected' : ''}`}
                                     onClick={() => setTheme('dark')}
                                 >
-                                    <span className="option-icon">🌑</span>
-                                    {t.darkMode}
+                                    <span className="theme-preview dark" aria-hidden="true"><i /><i /><i /></span>
+                                    <span className="option-card-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Icon name="moon" size={16} />
+                                        {t.darkMode}
+                                    </span>
+                                    <CheckMark />
                                 </button>
                                 <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={theme === 'light'}
                                     className={`option-card ${theme === 'light' ? 'selected' : ''}`}
                                     onClick={() => setTheme('light')}
                                 >
-                                    <span className="option-icon">☀️</span>
-                                    {t.lightMode}
+                                    <span className="theme-preview light" aria-hidden="true"><i /><i /><i /></span>
+                                    <span className="option-card-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <Icon name="sun" size={16} />
+                                        {t.lightMode}
+                                    </span>
+                                    <CheckMark />
                                 </button>
                             </div>
-
-                            <div className="divider" style={{ marginTop: '2rem' }} />
-
-                            <div style={{ 
-                                background: 'var(--bg-input)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-md)',
-                                padding: '1rem 1.25rem',
-                                fontSize: '0.82rem',
-                                color: 'var(--text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem'
-                            }}>
-                                <span>💡</span>
-                                Seçilen tema tüm sayfalara uygulanır ve otomatik kaydedilir.
-                            </div>
-                        </div>
+                        </section>
                     )}
 
                     {/* LANGUAGE TAB */}
                     {currentTab === 'language' && (
-                        <div>
-                            <div className="settings-section-title">🌐 {t.language}</div>
-                            <div className="settings-section-desc">
-                                Arayüz dilini seç
-                            </div>
-                            <div className="option-grid">
+                        <section>
+                            <h2 className="settings-section-title">{t.language}</h2>
+                            <p className="settings-section-desc">{t.languageDesc}</p>
+                            <div className="option-grid" role="radiogroup" aria-label={t.language}>
                                 <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={lang === 'tr'}
                                     className={`option-card ${lang === 'tr' ? 'selected' : ''}`}
                                     onClick={() => setLang('tr')}
                                 >
-                                    <span className="option-icon">🇹🇷</span>
-                                    Türkçe
+                                    <span className="lang-badge" aria-hidden="true">TR</span>
+                                    <span className="option-card-label">Türkçe</span>
+                                    <CheckMark />
                                 </button>
                                 <button
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={lang === 'en'}
                                     className={`option-card ${lang === 'en' ? 'selected' : ''}`}
                                     onClick={() => setLang('en')}
                                 >
-                                    <span className="option-icon">🇬🇧</span>
-                                    English
+                                    <span className="lang-badge" aria-hidden="true">EN</span>
+                                    <span className="option-card-label">English</span>
+                                    <CheckMark />
                                 </button>
                             </div>
-                        </div>
+                        </section>
                     )}
 
                     {/* SECURITY TAB */}
                     {currentTab === 'security' && (
-                        <div>
-                            <div className="settings-section-title">🔒 {t.changePassword}</div>
-                            <div className="settings-section-desc">
-                                Şifreni değiştirirken tüm notlar otomatik olarak yeniden şifrelenir
-                            </div>
+                        <section>
+                            <h2 className="settings-section-title">{t.changePassword}</h2>
+                            <p className="settings-section-desc">{t.securityDesc}</p>
 
-                            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                <div className="input-group">
-                                    <label>{t.currentPassword}</label>
+                            <form onSubmit={handleChangePassword}>
+                                <div className="field">
+                                    <label className="field-label" htmlFor="current-password">{t.currentPassword}</label>
                                     <input
+                                        id="current-password"
+                                        className="input"
                                         type="password"
+                                        autoComplete="current-password"
                                         value={currentPassword}
                                         onChange={e => setCurrentPassword(e.target.value)}
-                                        placeholder="Mevcut şifreni gir"
+                                        placeholder={t.currentPasswordPlaceholder}
                                         required
                                     />
                                 </div>
 
-                                <div className="divider" />
+                                <div className="settings-divider" />
 
-                                <div className="input-group">
-                                    <label>{t.newPassword}</label>
+                                <div className="field">
+                                    <label className="field-label" htmlFor="new-password">{t.newPassword}</label>
                                     <input
+                                        id="new-password"
+                                        className="input"
                                         type="password"
+                                        autoComplete="new-password"
                                         value={newPassword}
                                         onChange={e => setNewPassword(e.target.value)}
-                                        placeholder="Yeni şifreni gir"
+                                        placeholder={t.newPasswordPlaceholder}
                                         required
                                     />
                                 </div>
 
-                                <div className="input-group">
-                                    <label>{t.confirmPassword}</label>
+                                <div className="field">
+                                    <label className="field-label" htmlFor="confirm-password">{t.confirmPassword}</label>
                                     <input
+                                        id="confirm-password"
+                                        className="input"
                                         type="password"
+                                        autoComplete="new-password"
                                         value={confirmPassword}
                                         onChange={e => setConfirmPassword(e.target.value)}
-                                        placeholder="Yeni şifreyi tekrar gir"
+                                        placeholder={t.confirmPasswordPlaceholder}
                                         required
                                     />
                                 </div>
 
                                 {passwordError && (
-                                    <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
-                                        ⚠️ {passwordError}
+                                    <div className="notice notice-error" role="alert">
+                                        <Icon name="alert" size={16} />
+                                        <span>{passwordError}</span>
                                     </div>
                                 )}
                                 {passwordSuccess && (
-                                    <div className="alert alert-success" style={{ marginBottom: '1rem' }}>
-                                        ✓ {passwordSuccess}
+                                    <div className="notice notice-success" role="status">
+                                        <Icon name="check" size={16} />
+                                        <span>{passwordSuccess}</span>
                                     </div>
                                 )}
 
-                                <div>
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary"
-                                        disabled={processing}
-                                    >
-                                        {processing ? (
-                                            <>
-                                                <span className="loading-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
-                                                {t.processing}
-                                            </>
-                                        ) : (
-                                            <>🔑 {t.updatePassword}</>
-                                        )}
-                                    </button>
-                                </div>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    disabled={processing}
+                                    aria-busy={processing}
+                                >
+                                    {processing ? (
+                                        <>
+                                            <span className="spinner" aria-hidden="true" />
+                                            {t.processing}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Icon name="key" size={16} />
+                                            {t.updatePassword}
+                                        </>
+                                    )}
+                                </button>
                             </form>
 
-                            <div className="divider" />
+                            <div className="settings-divider" />
 
-                            <div style={{
-                                background: 'var(--danger-subtle)',
-                                border: '1px solid rgba(255,71,87,0.2)',
-                                borderRadius: 'var(--radius-md)',
-                                padding: '1rem 1.25rem',
-                                fontSize: '0.82rem',
-                                color: 'var(--danger)',
-                                display: 'flex',
-                                gap: '0.5rem',
-                                alignItems: 'flex-start',
-                            }}>
-                                <span>⚠️</span>
-                                <span>Şifreni unutursan notlarına bir daha erişemezsin. Güvenli bir yerde sakla!</span>
+                            <div className="notice notice-warning" role="note">
+                                <Icon name="alert" size={16} />
+                                <span>{t.forgetWarning}</span>
                             </div>
-                        </div>
+                        </section>
                     )}
 
                 </div>

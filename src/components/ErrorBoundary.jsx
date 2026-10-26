@@ -18,25 +18,16 @@ class ErrorBoundary extends React.Component {
     render() {
         if (this.state.hasError) {
             return (
-                <div style={{ padding: '2rem', color: 'white', background: '#0f172a', height: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
-                    <h1 style={{ color: '#ef4444' }}>Bir hata oluştu / Something went wrong</h1>
+                <div className="error-screen" role="alert">
+                    <span className="eyebrow">Hata / Error</span>
+                    <h1>Bir hata oluştu / Something went wrong</h1>
                     <p>Lütfen bu hatayı geliştiriciye bildirin:</p>
-                    <pre style={{ color: '#ef4444', background: '#1e293b', padding: '1rem', borderRadius: '0.5rem', whiteSpace: 'pre-wrap', marginBottom: '1rem' }}>
+                    <pre>
                         {this.state.error && this.state.error.toString()}
                         <br />
                         {this.state.errorInfo && this.state.errorInfo.componentStack}
                     </pre>
-                    <button
-                        onClick={() => window.location.reload()}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            fontWeight: 'bold'
-                        }}>
+                    <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
                         Uygulamayı Yeniden Başlat / Reload App
                     </button>
                 </div>

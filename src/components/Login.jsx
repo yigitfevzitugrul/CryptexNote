@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { deriveKey, encryptData, decryptData } from '../utils/crypto';
 import { hasUser, getAuthMetadata, saveAuthMetadata, saveLastUsername, getLastUsername } from '../utils/storage';
 import { translations } from '../utils/i18n';
+import Icon, { Seal } from './Icon';
 
 export default function Login({ onLogin, lang = 'tr' }) {
     const isNewUser = !hasUser();
@@ -15,7 +16,7 @@ export default function Login({ onLogin, lang = 'tr' }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const t = translations[lang];
+    const t = translations[lang] || translations.tr;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -52,100 +53,121 @@ export default function Login({ onLogin, lang = 'tr' }) {
 
     return (
         <div className="login-screen">
-            {/* Background glow orbs */}
-            <div className="login-bg-glow login-bg-glow-1" />
-            <div className="login-bg-glow login-bg-glow-2" />
+            <section className="login-cover clay" aria-hidden="true">
+                <span className="float-tile t1"><Icon name="lock" size={30} strokeWidth={2.2} /></span>
+                <span className="float-tile t2"><Icon name="notes" size={24} strokeWidth={2.2} /></span>
+                <span className="float-tile t3"><Icon name="key" size={26} strokeWidth={2.2} /></span>
 
-            <div className="login-card">
-                <div className="login-header">
-                    <div className="login-icon">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
-                    </div>
-                    <h1 className="login-title">
-                        {isNewUser ? t.registerTitle : t.loginTitle}
-                    </h1>
-                    <p className="login-subtitle">
-                        {isNewUser
-                            ? 'Güvenli notlarına erişmek için bir hesap oluştur'
-                            : 'Şifreli notlarına erişmek için giriş yap'
-                        }
-                    </p>
+                <div className="brand">
+                    <Seal size={40} />
+                    <span className="brand-name">Günlük</span>
                 </div>
 
-                {isNewUser && (
-                    <div className="login-alert">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/>
-                            <line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                        <span>{t.newDeviceWarning}</span>
-                    </div>
-                )}
+                <div className="login-quote">
+                    <span className="pill"><span className="pill-dot" />{t.coverEyebrow}</span>
+                    <h2>
+                        {t.coverTitleA} <em>{t.coverTitleEm}</em> {t.coverTitleB}
+                    </h2>
+                    <p>{t.coverText}</p>
+                </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <label>{t.username}</label>
-                        <input
-                            className="form-input"
-                            type="text"
-                            value={username}
-                            onChange={e => setUsername(e.target.value)}
-                            placeholder="Kullanıcı adın"
-                            required
-                            autoFocus={isNewUser && !savedUsername}
-                        />
+                <ul className="spec-list">
+                    <li className="pill">AES-GCM 256</li>
+                    <li className="pill">PBKDF2 · 100k</li>
+                    <li className="pill">{lang === 'tr' ? 'Yalnızca bu cihaz' : 'This device only'}</li>
+                </ul>
+            </section>
+
+            <main className="login-panel">
+                <div className="login-form-wrap clay">
+                    <div className="brand">
+                        <Seal size={36} />
+                        <span className="brand-name">Günlük</span>
                     </div>
 
-                    <div className="input-group">
-                        <label>{t.password}</label>
-                        <input
-                            className="form-input"
-                            type="password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                            autoFocus={!isNewUser || !!savedUsername}
-                        />
-                    </div>
+                    <span className="eyebrow">{isNewUser ? t.registerTitle : t.loginTitle}</span>
+                    <h1 className="login-title">
+                        {isNewUser
+                            ? (lang === 'tr' ? 'Defterini mühürle.' : 'Seal your notebook.')
+                            : (lang === 'tr' ? 'Tekrar hoş geldin.' : 'Welcome back.')}
+                    </h1>
+                    <p className="login-subtitle">
+                        {isNewUser ? t.registerSubtitle : t.loginSubtitle}
+                    </p>
 
-                    {error && (
-                        <div className="error-message">
-                            ⚠️ {error}
+                    {isNewUser && (
+                        <div className="notice notice-warning" role="note">
+                            <Icon name="alert" size={16} />
+                            <span>{t.newDeviceWarning}</span>
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary btn-lg btn-full"
-                        disabled={loading}
-                        style={{ marginTop: '0.5rem' }}
-                    >
-                        {loading ? (
-                            <>
-                                <span className="loading-spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
-                                {t.processing}
-                            </>
-                        ) : (
-                            isNewUser ? t.registerButton : t.loginButton
-                        )}
-                    </button>
-                </form>
+                    <form onSubmit={handleSubmit}>
+                        <div className="field">
+                            <label className="field-label" htmlFor="login-username">{t.username}</label>
+                            <input
+                                id="login-username"
+                                className="input"
+                                type="text"
+                                autoComplete="username"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                placeholder={t.usernamePlaceholder}
+                                required
+                                autoFocus={isNewUser && !savedUsername}
+                            />
+                        </div>
 
-                <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
-                        Uçtan uca şifrelenmiş · Yerel depolama
-                    </p>
+                        <div className="field">
+                            <label className="field-label" htmlFor="login-password">{t.password}</label>
+                            <input
+                                id="login-password"
+                                className="input"
+                                type="password"
+                                autoComplete={isNewUser ? 'new-password' : 'current-password'}
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                aria-invalid={!!error}
+                                aria-describedby={error ? 'login-error' : undefined}
+                                autoFocus={!isNewUser || !!savedUsername}
+                            />
+                        </div>
+
+                        {error && (
+                            <div className="notice notice-error" id="login-error" role="alert">
+                                <Icon name="alert" size={16} />
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-lg btn-full"
+                            disabled={loading}
+                            aria-busy={loading}
+                        >
+                            {loading ? (
+                                <>
+                                    <span className="spinner" aria-hidden="true" />
+                                    {t.processing}
+                                </>
+                            ) : (
+                                <>
+                                    <Icon name="lock" size={16} />
+                                    {isNewUser ? t.registerButton : t.loginButton}
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    <div className="login-foot eyebrow">
+                        <Icon name="lock" size={12} />
+                        {t.localStorageNote}
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
 }

@@ -6,11 +6,16 @@ import ErrorBoundary from './components/ErrorBoundary';
 function App() {
   const [session, setSession] = useState(null); // { key, username }
   const [lang, setLang] = useState('tr');
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('light');
 
   React.useEffect(() => {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Büyük harf dönüşümü (text-transform) dile göre doğru çalışsın: i → İ / I
+  React.useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const handleLogin = (key, username) => {
     setSession({ key, username });
