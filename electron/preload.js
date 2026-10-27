@@ -8,4 +8,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('fullscreen-changed', (_, isFS) => callback(isFS));
         return () => ipcRenderer.removeAllListeners('fullscreen-changed');
     },
+    // Şifreli yedek dosyasını kaydet (kayıt penceresi ana süreçte açılır)
+    saveBackup: (content, defaultName) => ipcRenderer.invoke('save-backup', { content, defaultName }),
 });

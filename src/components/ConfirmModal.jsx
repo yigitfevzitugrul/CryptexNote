@@ -1,7 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import Icon from './Icon';
 
-export default function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText, cancelText }) {
+// Onay penceresi. Varsayılan: silme onayı (çöp kutusu ikonu, kırmızı onay butonu).
+// İsteğe bağlı üçüncü seçenek: secondaryText + onSecondary (ör. "Kaydetmeden çık").
+export default function ConfirmModal({
+    isOpen,
+    onClose,
+    onConfirm,
+    title,
+    message,
+    confirmText,
+    cancelText,
+    icon = 'trash',
+    tone = 'danger',
+    confirmVariant = 'danger',
+    secondaryText,
+    onSecondary,
+}) {
     const cancelRef = useRef(null);
     const onCloseRef = useRef(onClose);
 
@@ -36,17 +51,27 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title, messag
                 aria-describedby="confirm-modal-message"
                 onClick={e => e.stopPropagation()}
             >
-                <div className="modal-icon">
-                    <Icon name="trash" size={20} />
+                <div className="modal-icon" data-tone={tone}>
+                    <Icon name={icon} size={20} />
                 </div>
                 <h3 className="modal-title" id="confirm-modal-title">{title}</h3>
                 <p className="modal-message" id="confirm-modal-message">{message}</p>
                 <div className="modal-actions">
-                    <button ref={cancelRef} type="button" className="btn btn-secondary" onClick={onClose}>
+                    <button
+                        ref={cancelRef}
+                        type="button"
+                        className={`btn ${secondaryText ? 'btn-ghost' : 'btn-secondary'}`}
+                        onClick={onClose}
+                    >
                         {cancelText || 'İptal'}
                     </button>
-                    <button type="button" className="btn btn-danger" onClick={onConfirm}>
-                        <Icon name="trash" size={15} />
+                    {secondaryText && onSecondary && (
+                        <button type="button" className="btn btn-danger" onClick={onSecondary}>
+                            {secondaryText}
+                        </button>
+                    )}
+                    <button type="button" className={`btn btn-${confirmVariant}`} onClick={onConfirm}>
+                        {icon === 'trash' && <Icon name="trash" size={15} />}
                         {confirmText || 'Sil'}
                     </button>
                 </div>

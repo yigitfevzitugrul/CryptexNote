@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { translations } from '../utils/i18n';
 import Icon from './Icon';
 import { deriveKey, encryptData, decryptData } from '../utils/crypto';
 import { loadRawNotes, saveRawNotes, getAuthMetadata, saveAuthMetadata } from '../utils/storage';
+import { createBackup, backupFileName, parseBackup, restoreBackup, MAX_BACKUP_BYTES } from '../utils/backup';
+
+// Otomatik kilit seçenekleri (dakika, 0 = kapalı)
+const AUTO_LOCK_OPTIONS = [0, 1, 5, 15, 30, 60];
 
 function CheckMark() {
     return (
@@ -12,7 +16,10 @@ function CheckMark() {
     );
 }
 
-export default function Settings({ lang, setLang, theme, setTheme, onPasswordChanged }) {
+export default function Settings({
+    lang, setLang, theme, setTheme, onPasswordChanged,
+    encryptionKey, onNotesImported, autoLockMinutes, setAutoLockMinutes,
+}) {
     const [currentTab, setCurrentTab] = useState('appearance');
     const t = translations[lang] || translations.tr;
 
@@ -23,6 +30,81 @@ export default function Settings({ lang, setLang, theme, setTheme, onPasswordCha
     const [passwordError, setPasswordError] = useState('');
     const [passwordSuccess, setPasswordSuccess] = useState('');
     const [processing, setProcessing] = useState(false);
+
+    // Yedekleme durumu
+    const [exportMsg, setExportMsg] = useState(null); // { type, text }
+    const [importFile, setImportFile] = useState(null); // { name, data }
+    const [importPassword, setImportPassword] = useState('');
+    const [importMsg, setImportMsg] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const fileInputRef = useRef(null);
+
+    async function handleExport() {
+        setExportMsg(null);
+        try {
+            const content = createBackup();
+            const name = backupFileName();
+            if (window.electronAPI?.saveBackup) {
+                // Masaüstü: yerel "Farklı Kaydet" penceresi
+                const res = await window.electronAPI.saveBackup(content, name);
+                if (res?.ok) setExportMsg({ type: 'success', text: `${t.exportDone} ${res.filePath}` });
+                else if (!res?.canceled) setExportMsg({ type: 'error', text: t.backupError });
+            } else {
+                // Tarayıcı: dosya indirme
+                const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                setExportMsg({ type: 'success', text: `${t.exportDoneWeb} ${name}` });
+            }
+        } catch (err) {
+            console.error(err);
+            setExportMsg({ type: 'error', text: t.backupError });
+        }
+    }
+
+    async function handleFileChosen(e) {
+        setImportMsg(null);
+        setImportFile(null);
+        const file = e.target.files?.[0];
+        e.target.value = ''; // aynı dosya tekrar seçilebilsin
+        if (!file) return;
+        if (file.size > MAX_BACKUP_BYTES) {
+            setImportMsg({ type: 'error', text: t.invalidBackup });
+            return;
+        }
+        try {
+            const data = parseBackup(await file.text());
+            setImportFile({ name: file.name, data });
+        } catch {
+            setImportMsg({ type: 'error', text: t.invalidBackup });
+        }
+    }
+
+    async function handleImport(e) {
+        e.preventDefault();
+        if (!importFile) return;
+        setImporting(true);
+        setImportMsg(null);
+        try {
+            const r = await restoreBackup(importFile.data, importPassword, encryptionKey);
+            let text = `${r.added} ${t.importAdded}, ${r.updated} ${t.importUpdated}, ${r.skipped} ${t.importSkipped}`;
+            if (r.failed) text += `, ${r.failed} ${t.importFailed}`;
+            setImportMsg({ type: 'success', text: `${text}.` });
+            setImportFile(null);
+            setImportPassword('');
+            if (r.added || r.updated) await onNotesImported?.();
+        } catch (err) {
+            if (err?.code !== 'wrong-password') console.error(err);
+            setImportMsg({ type: 'error', text: err?.code === 'wrong-password' ? t.wrongBackupPassword : t.backupError });
+        } finally {
+            setImporting(false);
+        }
+    }
 
     async function handleChangePassword(e) {
         e.preventDefault();
@@ -86,6 +168,8 @@ export default function Settings({ lang, setLang, theme, setTheme, onPasswordCha
         { id: 'appearance', label: t.appearance, icon: 'palette' },
         { id: 'language', label: t.language, icon: 'globe' },
         { id: 'security', label: t.changePassword, icon: 'key' },
+        { id: 'autolock', label: t.autoLock, icon: 'timer' },
+        { id: 'backup', label: t.backup, icon: 'archive' },
     ];
 
     return (
@@ -278,6 +362,117 @@ export default function Settings({ lang, setLang, theme, setTheme, onPasswordCha
                         </section>
                     )}
 
+
+                    {/* AUTO-LOCK TAB */}
+                    {currentTab === 'autolock' && (
+                        <section>
+                            <h2 className="settings-section-title">{t.autoLock}</h2>
+                            <p className="settings-section-desc">{t.autoLockDesc}</p>
+                            <div className="choice-grid" role="radiogroup" aria-label={t.autoLock}>
+                                {AUTO_LOCK_OPTIONS.map(min => (
+                                    <button
+                                        key={min}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={autoLockMinutes === min}
+                                        className={`choice-chip ${autoLockMinutes === min ? 'selected' : ''}`}
+                                        onClick={() => setAutoLockMinutes(min)}
+                                    >
+                                        {min === 0 ? t.autoLockOff : `${min} ${t.minutes}`}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="settings-divider" />
+                            <div className={`notice ${autoLockMinutes ? 'notice-success' : 'notice-warning'}`} role="status">
+                                <Icon name={autoLockMinutes ? 'lock' : 'alert'} size={16} />
+                                <span>
+                                    {autoLockMinutes
+                                        ? `${t.autoLockActive} ${autoLockMinutes} ${t.minutes}.`
+                                        : t.autoLockOffWarning}
+                                </span>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* BACKUP TAB */}
+                    {currentTab === 'backup' && (
+                        <section>
+                            <h2 className="settings-section-title">{t.backup}</h2>
+                            <p className="settings-section-desc">{t.backupDesc}</p>
+
+                            <h3 className="settings-subtitle">{t.exportBackup}</h3>
+                            <p className="settings-hint">{t.exportHint}</p>
+                            <button type="button" className="btn btn-primary" onClick={handleExport}>
+                                <Icon name="download" size={16} />
+                                {t.exportBackup}
+                            </button>
+                            {exportMsg && (
+                                <div className={`notice notice-${exportMsg.type} backup-msg`} role={exportMsg.type === 'error' ? 'alert' : 'status'}>
+                                    <Icon name={exportMsg.type === 'error' ? 'alert' : 'check'} size={16} />
+                                    <span className="backup-msg-text">{exportMsg.text}</span>
+                                </div>
+                            )}
+
+                            <div className="settings-divider" />
+
+                            <h3 className="settings-subtitle">{t.importBackup}</h3>
+                            <p className="settings-hint">{t.importDesc}</p>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".json,application/json"
+                                className="visually-hidden"
+                                tabIndex={-1}
+                                aria-hidden="true"
+                                onChange={handleFileChosen}
+                            />
+                            <button type="button" className="btn btn-secondary" onClick={() => fileInputRef.current?.click()}>
+                                <Icon name="upload" size={16} />
+                                {t.chooseFile}
+                            </button>
+
+                            {importFile && (
+                                <form onSubmit={handleImport} className="import-form">
+                                    <p className="settings-hint">
+                                        <strong>{t.selectedFile}:</strong> {importFile.name} · {importFile.data.notes.length} {importFile.data.notes.length === 1 ? t.notesCountOne : t.notesCount}
+                                    </p>
+                                    <div className="field">
+                                        <label className="field-label" htmlFor="backup-password">{t.backupPassword}</label>
+                                        <input
+                                            id="backup-password"
+                                            className="input"
+                                            type="password"
+                                            autoComplete="off"
+                                            value={importPassword}
+                                            onChange={e => setImportPassword(e.target.value)}
+                                            placeholder={t.backupPasswordPlaceholder}
+                                            required
+                                        />
+                                    </div>
+                                    <button type="submit" className="btn btn-primary" disabled={importing} aria-busy={importing}>
+                                        {importing ? (
+                                            <>
+                                                <span className="spinner" aria-hidden="true" />
+                                                {t.processing}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icon name="upload" size={16} />
+                                                {t.restore}
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+                            )}
+
+                            {importMsg && (
+                                <div className={`notice notice-${importMsg.type} backup-msg`} role={importMsg.type === 'error' ? 'alert' : 'status'}>
+                                    <Icon name={importMsg.type === 'error' ? 'alert' : 'check'} size={16} />
+                                    <span>{importMsg.text}</span>
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,13 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { encryptData, decryptData } from '../utils/crypto';
 import { loadRawNotes, saveRawNotes } from '../utils/storage';
 import { translations } from '../utils/i18n';
 import NoteEditor from './NoteEditor';
 import Settings from './Settings';
 import ConfirmModal from './ConfirmModal';
-import Icon, { Seal } from './Icon';
+import CalendarView from './CalendarView';
+import Icon, { Seal, MoodFace } from './Icon';
+import { htmlToText } from '../utils/sanitize';
+import { getMood } from '../utils/moods';
 
-export default function Dashboard({ encryptionKey, username, onLogout, lang, setLang, theme, setTheme, onPasswordChanged }) {
+// Sabitlenen notlar önce, sonra en son düzenlenen
+const sortNotes = (list) => [...list].sort((a, b) =>
+    (Number(!!b.pinned) - Number(!!a.pinned)) || (new Date(b.date) - new Date(a.date))
+);
+
+// Şifrelenerek saklanan not alanları (id ayrı tutulur)
+const serializeNote = (n) => ({
+    title: n.title,
+    content: n.content,
+    date: n.date,
+    createdAt: n.createdAt || n.date,
+    pinned: !!n.pinned,
+    mood: n.mood || null,
+});
+
+export default function Dashboard({ encryptionKey, username, onLogout, onAutoLock, autoLockMinutes, setAutoLockMinutes, lang, setLang, theme, setTheme, onPasswordChanged }) {
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingNote, setEditingNote] = useState(null);
@@ -49,8 +67,9 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
         loadNotes();
     }, [encryptionKey]);
 
-    async function loadNotes() {
-        setLoading(true);
+    // silent: ekranı "yükleniyor"a çevirmeden yenile (ör. yedek geri yüklendikten sonra)
+    async function loadNotes({ silent = false } = {}) {
+        if (!silent) setLoading(true);
         try {
             const raw = loadRawNotes();
             if (!Array.isArray(raw)) {
@@ -70,21 +89,26 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                     return null;
                 }
             }));
-            setNotes(decrypted.filter(n => n !== null).sort((a, b) => new Date(b.date) - new Date(a.date)));
+            setNotes(sortNotes(decrypted.filter(n => n !== null)));
         } catch (e) {
             console.error(e);
             alert("Notlar yüklenirken hata oluştu: " + e.message);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }
 
     async function handleSave(noteData) {
-        const newNote = {
+        const now = new Date().toISOString();
+        const newNote = serializeNote({
             title: noteData.title,
             content: noteData.content,
-            date: new Date().toISOString()
-        };
+            date: now,
+            // Takvim, notun yazıldığı günü kullanır; düzenleme bunu değiştirmez
+            createdAt: editingNote ? (editingNote.createdAt || editingNote.date) : now,
+            pinned: editingNote ? editingNote.pinned : false,
+            mood: noteData.mood,
+        });
 
         const encryptedData = await encryptData(JSON.stringify(newNote), encryptionKey);
 
@@ -126,6 +150,54 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
         setModal({ isOpen: false, noteId: null });
     }
 
+    // Sabitle / sabitlemeyi kaldır — düzenleme tarihi değişmez
+    async function togglePin(note) {
+        const updated = serializeNote({ ...note, pinned: !note.pinned });
+        const encryptedData = await encryptData(JSON.stringify(updated), encryptionKey);
+        const raw = loadRawNotes();
+        saveRawNotes(raw.map(n => (n.id === note.id ? { id: n.id, encryptedData } : n)));
+        setNotes(prev => sortNotes(prev.map(n => (n.id === note.id ? { ...updated, id: note.id } : n))));
+    }
+
+    // Açık editördeki kaydedilmemiş taslağı okuyan fonksiyon (NoteEditor kaydeder)
+    const draftGetterRef = useRef(null);
+    const registerDraft = useCallback((getter) => {
+        draftGetterRef.current = getter;
+    }, []);
+
+    const handleSaveRef = useRef(handleSave);
+    useEffect(() => {
+        handleSaveRef.current = handleSave;
+    });
+
+    // Otomatik kilit: belirlenen süre boyunca etkileşim olmazsa taslağı kaydet ve kilitle
+    useEffect(() => {
+        if (!autoLockMinutes || !onAutoLock) return;
+        const limitMs = autoLockMinutes * 60000;
+        let lastActivity = Date.now();
+        let locking = false;
+        const markActive = () => { lastActivity = Date.now(); };
+        const events = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'];
+        events.forEach(ev => window.addEventListener(ev, markActive, { passive: true, capture: true }));
+
+        const timer = setInterval(async () => {
+            if (locking || Date.now() - lastActivity < limitMs) return;
+            locking = true;
+            try {
+                const draft = draftGetterRef.current?.();
+                if (draft) await handleSaveRef.current(draft);
+            } catch (e) {
+                console.error('Kilit öncesi taslak kaydedilemedi', e);
+            }
+            onAutoLock();
+        }, 5000);
+
+        return () => {
+            events.forEach(ev => window.removeEventListener(ev, markActive, { capture: true }));
+            clearInterval(timer);
+        };
+    }, [autoLockMinutes, onAutoLock]);
+
     // Avatar initials
     const initials = username
         ? username.slice(0, 2).toUpperCase()
@@ -152,6 +224,7 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                     lang={lang}
                     isFullscreen={isFullscreen}
                     onToggleFullscreen={toggleFullscreen}
+                    onRegisterDraft={registerDraft}
                 />
 
                 <ConfirmModal
@@ -167,13 +240,8 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
         );
     }
 
-    // Strip HTML tags to get plain text for preview/search
-    const stripHtml = (html) => {
-        if (!html) return '';
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        return tmp.textContent || tmp.innerText || '';
-    };
+    // Önizleme/arama için düz metin — etkisiz belgede ayrıştırılır, hiçbir şey çalışmaz
+    const stripHtml = htmlToText;
 
     // Filter notes by search
     const filteredNotes = notes.filter(note =>
@@ -183,6 +251,8 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
     );
 
     const locale = lang === 'tr' ? 'tr-TR' : 'en-US';
+
+    const latestNote = notes.reduce((acc, n) => (!acc || new Date(n.date) > new Date(acc.date) ? n : acc), null);
 
     const formatDate = (dateStr) => {
         if (!dateStr) return '-';
@@ -229,6 +299,16 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                         <Icon name="notes" size={17} />
                         <span className="nav-label">{t.notes}</span>
                         {notes.length > 0 && <span className="nav-count">{notes.length}</span>}
+                    </button>
+                    <button
+                        type="button"
+                        className={`nav-item ${currentView === 'calendar' ? 'active' : ''}`}
+                        onClick={() => setCurrentView('calendar')}
+                        aria-current={currentView === 'calendar' ? 'page' : undefined}
+                        title={t.calendar}
+                    >
+                        <Icon name="calendar" size={17} />
+                        <span className="nav-label">{t.calendar}</span>
                     </button>
                     <button
                         type="button"
@@ -281,10 +361,10 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                                 <h1 className="page-title">{t.myNotes}</h1>
                                 <div className="page-meta">
                                     <span className="pill">{notes.length} {notes.length === 1 ? t.notesCountOne : t.notesCount}</span>
-                                    {notes[0] && (
+                                    {latestNote && (
                                         <span className="pill">
                                             <Icon name="clock" size={12} />
-                                            {t.lastEdited}: {formatDate(notes[0].date)}
+                                            {t.lastEdited}: {formatDate(latestNote.date)}
                                         </span>
                                     )}
                                     <span className="pill">
@@ -345,10 +425,11 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                             ) : (
                                 filteredNotes.map((note, idx) => {
                                     const preview = stripHtml(note.content);
+                                    const noteMood = getMood(note.mood);
                                     return (
                                         <article
                                             key={note.id}
-                                            className="note-card"
+                                            className={`note-card ${note.pinned ? 'is-pinned' : ''}`}
                                             style={{ animationDelay: `${Math.min(idx, 12) * 0.035}s` }}
                                         >
                                             <button
@@ -368,7 +449,27 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                                                 <span className="note-footer eyebrow">
                                                     <Icon name="lock" size={12} />
                                                     {t.sealed} · {formatDate(note.date)}
+                                                    {noteMood && (
+                                                        <span
+                                                            className="mood-dot"
+                                                            data-tone={noteMood.tone}
+                                                            title={t[noteMood.labelKey]}
+                                                        >
+                                                            <MoodFace mood={note.mood} size={18} />
+                                                            <span className="visually-hidden">{t[noteMood.labelKey]}</span>
+                                                        </span>
+                                                    )}
                                                 </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`note-pin-btn ${note.pinned ? 'active' : ''}`}
+                                                onClick={() => togglePin(note)}
+                                                aria-pressed={!!note.pinned}
+                                                aria-label={`${note.pinned ? t.unpin : t.pin}: ${note.title || t.untitled}`}
+                                                title={note.pinned ? t.unpin : t.pin}
+                                            >
+                                                <Icon name="pin" size={15} fill={note.pinned ? 'currentColor' : 'none'} />
                                             </button>
                                             <button
                                                 type="button"
@@ -387,6 +488,12 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                     </div>
                 )}
 
+                {currentView === 'calendar' && (
+                    <div className="page">
+                        <CalendarView notes={notes} lang={lang} onOpenNote={setEditingNote} />
+                    </div>
+                )}
+
                 {currentView === 'settings' && (
                     <div className="page">
                         <Settings
@@ -395,6 +502,10 @@ export default function Dashboard({ encryptionKey, username, onLogout, lang, set
                             theme={theme}
                             setTheme={setTheme}
                             onPasswordChanged={onPasswordChanged}
+                            encryptionKey={encryptionKey}
+                            onNotesImported={() => loadNotes({ silent: true })}
+                            autoLockMinutes={autoLockMinutes}
+                            setAutoLockMinutes={setAutoLockMinutes}
                         />
                     </div>
                 )}

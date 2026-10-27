@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
+import { writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -82,6 +83,28 @@ ipcMain.handle('toggle-fullscreen', () => {
 // IPC: Tam ekran durumu sorgula
 ipcMain.handle('is-fullscreen', () => {
     return mainWindow ? mainWindow.isFullScreen() : false;
+});
+
+// IPC: Şifreli yedeği kullanıcının seçtiği konuma kaydet
+const MAX_BACKUP_BYTES = 200 * 1024 * 1024;
+ipcMain.handle('save-backup', async (_event, payload) => {
+    const content = payload?.content;
+    const defaultName = typeof payload?.defaultName === 'string'
+        ? path.basename(payload.defaultName).replace(/[^\w.-]/g, '_')
+        : 'gunluk-yedek.json';
+    if (typeof content !== 'string' || content.length === 0 || content.length > MAX_BACKUP_BYTES) {
+        return { ok: false, error: 'invalid-content' };
+    }
+
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Yedeği kaydet',
+        defaultPath: path.join(app.getPath('documents'), defaultName),
+        filters: [{ name: 'Günlük yedeği', extensions: ['json'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+
+    await writeFile(filePath, content, 'utf-8');
+    return { ok: true, filePath };
 });
 
 // App hazır olunca pencereyi aç

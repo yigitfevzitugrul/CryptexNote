@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { translations } from '../utils/i18n';
-import Icon from './Icon';
+import Icon, { MoodFace } from './Icon';
+import ConfirmModal from './ConfirmModal';
+import { sanitizeHtml, textToHtml } from '../utils/sanitize';
+import { MOODS, getMood } from '../utils/moods';
 
 const TEXT_COLORS = [
     { label: 'Kırmızı', value: '#ef4444' },
@@ -48,7 +51,7 @@ function ToolbarBtn({ onClick, title: tip, active, children, ariaExpanded }) {
     );
 }
 
-export default function NoteEditor({ initialData, onSave, onCancel, onDelete, lang = 'tr', isFullscreen, onToggleFullscreen }) {
+export default function NoteEditor({ initialData, onSave, onCancel, onDelete, lang = 'tr', isFullscreen, onToggleFullscreen, onRegisterDraft }) {
     const [title, setTitle] = useState(initialData?.title || '');
     const [wordCount, setWordCount] = useState(0);
     const [charCount, setCharCount] = useState(0);
@@ -60,6 +63,8 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
     // Mevcut notlar okuma modunda, yeni notlar düzenleme modunda açılır
     const [isReading, setIsReading] = useState(!!initialData);
     const [isDirty, setIsDirty] = useState(false);
+    const [mood, setMood] = useState(initialData?.mood || null);
+    const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
     const editorRef = useRef(null);
     const colorPickerRef = useRef(null);
     const highlightPickerRef = useRef(null);
@@ -87,7 +92,7 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
     // Set initial content
     useEffect(() => {
         if (editorRef.current) {
-            editorRef.current.innerHTML = initialData?.content || '';
+            editorRef.current.innerHTML = sanitizeHtml(initialData?.content || '', { keepStyles: true });
             updateCounts();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,9 +130,49 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
         updateCounts();
     };
 
+    const getContent = () => sanitizeHtml(editorRef.current?.innerHTML || '', { keepStyles: true });
+
     const handleSave = () => {
-        const content = editorRef.current?.innerHTML || '';
-        onSave({ title, content });
+        setShowUnsavedDialog(false);
+        onSave({ title, content: getContent(), mood });
+    };
+
+    // Kaydedilmemiş değişiklik varsa çıkmadan önce sor
+    const handleBack = () => {
+        if (isDirty) setShowUnsavedDialog(true);
+        else onCancel();
+    };
+
+    const selectMood = (id) => {
+        setMood(prev => (prev === id ? null : id));
+        setIsDirty(true);
+    };
+
+    // Yapıştırılan HTML temizlenir: yalnızca temel biçim kalır, script/resim/olay kodu atılır
+    const insertCleanHtml = (dataTransfer) => {
+        const html = dataTransfer.getData('text/html');
+        const text = dataTransfer.getData('text/plain');
+        const clean = html ? sanitizeHtml(html, { keepStyles: false }) : textToHtml(text);
+        if (clean) document.execCommand('insertHTML', false, clean);
+        setIsDirty(true);
+        updateCounts();
+    };
+
+    const handlePaste = (e) => {
+        e.preventDefault();
+        insertCleanHtml(e.clipboardData);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        // Bırakılan noktaya imleci taşı, sonra temizlenmiş içeriği ekle
+        const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+        if (range) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+        insertCleanHtml(e.dataTransfer);
     };
 
     const handleKeyDown = (e) => {
@@ -146,6 +191,25 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
         if (e.ctrlKey && e.key === 's') { e.preventDefault(); handleSave(); }
         if (e.key === 'Enter') { e.preventDefault(); editorRef.current?.focus(); }
     };
+
+    // Otomatik kilit devreye girmeden önce kaydedilmemiş taslak kaydedilebilsin
+    const latestRef = useRef({ isDirty, title, mood });
+    useEffect(() => {
+        latestRef.current = { isDirty, title, mood };
+    });
+    useEffect(() => {
+        if (!onRegisterDraft) return;
+        onRegisterDraft(() => {
+            const { isDirty: dirty, title: currentTitle, mood: currentMood } = latestRef.current;
+            if (!dirty) return null;
+            return {
+                title: currentTitle,
+                content: sanitizeHtml(editorRef.current?.innerHTML || '', { keepStyles: true }),
+                mood: currentMood,
+            };
+        });
+        return () => onRegisterDraft(null);
+    }, [onRegisterDraft]);
 
     // Ctrl+E: mod değiştir. Ctrl+S yazı alanında/başlıkta işlenmediyse (ör. okuma modu) burada yakalanır.
     useEffect(() => {
@@ -169,7 +233,7 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
             {/* ── TOP BAR ── */}
             <header className="editor-topbar clay">
                 <div className="editor-topbar-left">
-                    <button type="button" className="btn btn-ghost" onClick={onCancel} title={t.cancel}>
+                    <button type="button" className="btn btn-ghost" onClick={handleBack} title={t.cancel}>
                         <Icon name="arrowLeft" size={16} />
                         {t.back}
                     </button>
@@ -391,6 +455,34 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                             .toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </span>
                     {isReading ? (
+                        getMood(mood) && (
+                            <div className="mood-read">
+                                <span className="mood-chip" data-tone={getMood(mood).tone}>
+                                    <MoodFace mood={mood} size={18} />
+                                    {t[getMood(mood).labelKey]}
+                                </span>
+                            </div>
+                        )
+                    ) : (
+                        <div className="mood-picker" role="group" aria-label={t.moodQuestion}>
+                            <span className="mood-picker-label">{t.moodQuestion}</span>
+                            {MOODS.map(m => (
+                                <button
+                                    key={m.id}
+                                    type="button"
+                                    className={`mood-btn ${mood === m.id ? 'selected' : ''}`}
+                                    data-tone={m.tone}
+                                    aria-pressed={mood === m.id}
+                                    title={t[m.labelKey]}
+                                    aria-label={t[m.labelKey]}
+                                    onClick={() => selectMood(m.id)}
+                                >
+                                    <MoodFace mood={m.id} size={24} />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {isReading ? (
                         <h1 className={`editor-title-input editor-title-read ${title ? '' : 'untitled'}`}>
                             {title || t.untitled}
                         </h1>
@@ -421,6 +513,8 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                         onKeyUp={updateActiveFormats}
                         onMouseUp={updateActiveFormats}
                         onKeyDown={handleKeyDown}
+                        onPaste={handlePaste}
+                        onDrop={handleDrop}
                         data-placeholder={isReading ? t.emptyNoteRead : t.editorPlaceholder}
                     />
                 </div>
@@ -448,6 +542,21 @@ export default function NoteEditor({ initialData, onSave, onCancel, onDelete, la
                     AES-GCM 256
                 </span>
             </footer>
+
+            <ConfirmModal
+                isOpen={showUnsavedDialog}
+                onClose={() => setShowUnsavedDialog(false)}
+                onConfirm={handleSave}
+                onSecondary={onCancel}
+                title={t.unsavedTitle}
+                message={t.unsavedMessage}
+                confirmText={t.saveAndExit}
+                secondaryText={t.discardAndExit}
+                cancelText={t.keepEditing}
+                icon="alert"
+                tone="warning"
+                confirmVariant="primary"
+            />
         </div>
     );
 }

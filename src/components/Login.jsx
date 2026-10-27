@@ -4,7 +4,7 @@ import { hasUser, getAuthMetadata, saveAuthMetadata, saveLastUsername, getLastUs
 import { translations } from '../utils/i18n';
 import Icon, { Seal } from './Icon';
 
-export default function Login({ onLogin, lang = 'tr' }) {
+export default function Login({ onLogin, lang = 'tr', lockedByIdle = false }) {
     const isNewUser = !hasUser();
     const storedMetadata = getAuthMetadata();
 
@@ -94,6 +94,13 @@ export default function Login({ onLogin, lang = 'tr' }) {
                     <p className="login-subtitle">
                         {isNewUser ? t.registerSubtitle : t.loginSubtitle}
                     </p>
+
+                    {lockedByIdle && !isNewUser && (
+                        <div className="notice notice-warning" role="status">
+                            <Icon name="timer" size={16} />
+                            <span>{t.lockedNotice}</span>
+                        </div>
+                    )}
 
                     {isNewUser && (
                         <div className="notice notice-warning" role="note">
