@@ -1,6 +1,7 @@
 # CryptexNote
 
 **Uçtan uca şifreli, tamamen çevrimdışı çalışan kişisel not defteri ve günlük.**
+
 **An end-to-end encrypted, fully offline personal notebook and journal.**
 
 [Türkçe](#türkçe) · [English](#english)
