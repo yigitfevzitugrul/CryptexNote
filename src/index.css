@@ -1470,8 +1470,25 @@ body[data-theme="dark"] .login-cover .spec-list li {
 }
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+/* Üç seçenekli pencere: iki ana eylem yan yana, "Vazgeç" altta tam genişlikte */
+.modal-card.has-secondary {
+  max-width: 460px;
+}
+.modal-actions.has-secondary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.modal-actions.has-secondary .btn {
+  white-space: normal;
+  text-align: center;
+}
+.modal-actions.has-secondary .btn-ghost {
+  grid-column: 1 / -1;
 }
 
 /* =====================================================================

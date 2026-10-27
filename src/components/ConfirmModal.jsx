@@ -41,10 +41,23 @@ export default function ConfirmModal({
 
     if (!isOpen) return null;
 
+    const hasSecondary = Boolean(secondaryText && onSecondary);
+
+    const cancelButton = (
+        <button
+            ref={cancelRef}
+            type="button"
+            className={`btn ${hasSecondary ? 'btn-ghost' : 'btn-secondary'}`}
+            onClick={onClose}
+        >
+            {cancelText || 'İptal'}
+        </button>
+    );
+
     return (
         <div className="modal-backdrop" onClick={onClose}>
             <div
-                className="modal-card"
+                className={`modal-card ${hasSecondary ? 'has-secondary' : ''}`}
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby="confirm-modal-title"
@@ -56,16 +69,10 @@ export default function ConfirmModal({
                 </div>
                 <h3 className="modal-title" id="confirm-modal-title">{title}</h3>
                 <p className="modal-message" id="confirm-modal-message">{message}</p>
-                <div className="modal-actions">
-                    <button
-                        ref={cancelRef}
-                        type="button"
-                        className={`btn ${secondaryText ? 'btn-ghost' : 'btn-secondary'}`}
-                        onClick={onClose}
-                    >
-                        {cancelText || 'İptal'}
-                    </button>
-                    {secondaryText && onSecondary && (
+                <div className={`modal-actions ${hasSecondary ? 'has-secondary' : ''}`}>
+                    {/* Üç seçenekte "Vazgeç" en altta: görsel sıra ile Tab sırası aynı kalsın */}
+                    {!hasSecondary && cancelButton}
+                    {hasSecondary && (
                         <button type="button" className="btn btn-danger" onClick={onSecondary}>
                             {secondaryText}
                         </button>
@@ -74,6 +81,7 @@ export default function ConfirmModal({
                         {icon === 'trash' && <Icon name="trash" size={15} />}
                         {confirmText || 'Sil'}
                     </button>
+                    {hasSecondary && cancelButton}
                 </div>
             </div>
         </div>
