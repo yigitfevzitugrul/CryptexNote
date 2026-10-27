@@ -266,7 +266,7 @@ export default function Dashboard({ encryptionKey, username, onLogout, onAutoLoc
         if (diffMins < 1) return t.justNow;
         if (diffMins < 60) return `${diffMins} ${t.minAgo}`;
         if (diffHours < 24) return `${diffHours} ${t.hourAgo}`;
-        if (diffDays < 7) return `${diffDays} ${t.dayAgo}`;
+        if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? t.dayAgoOne : t.dayAgo}`;
         return date.toLocaleDateString(locale);
     };
 
