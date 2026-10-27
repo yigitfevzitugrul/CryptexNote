@@ -18,6 +18,20 @@ CryptexNote, notlarını yalnızca senin şifrenle açılabilecek şekilde bilgi
 
 > **Not:** Bu, CryptexNote'un React + Electron ile baştan yazılmış ikinci neslidir. Eski Python/Tkinter sürümü [`1.0` etiketinde](https://github.com/yigitfevzitugrul/CryptexNote/tree/1.0) ve [Releases](https://github.com/yigitfevzitugrul/CryptexNote/releases) sayfasında durmaktadır.
 
+![CryptexNote not listesi](docs/screenshots/tr-notlar.png)
+
+### Ekran görüntüleri
+
+| Düzenleme modu ve ruh hâli | Takvim ve yazma serisi (karanlık tema) |
+|---|---|
+| ![Düzenleme modu](docs/screenshots/tr-duzenleme-modu.png) | ![Takvim](docs/screenshots/tr-takvim-karanlik.png) |
+| **Okuma modu** | **Giriş ekranı** |
+| ![Okuma modu](docs/screenshots/tr-okuma-modu.png) | ![Giriş ekranı](docs/screenshots/tr-giris.png) |
+| **Şifreli yedekleme** | |
+| ![Yedekleme](docs/screenshots/tr-yedekleme.png) | |
+
+> Ekran görüntülerindeki notlar örnek amaçlı oluşturulmuş demo içeriklerdir.
+
 ### Özellikler
 
 **Güvenlik**
@@ -109,6 +123,7 @@ src/
     i18n.js          Türkçe ve İngilizce metinler
   index.css          Tasarım sistemi ve stiller
 design-system/       Tasarım kararları
+docs/screenshots/    README ekran görüntüleri
 scripts/             Exe güncelleme betiği
 ```
 
@@ -123,6 +138,18 @@ React 19 · Vite 7 · Electron 39 · Web Crypto API · Baloo 2 ve Nunito fontlar
 CryptexNote is a desktop app that stores your notes on your own computer, readable only with your password. No server, no cloud, no sign-up: everything stays on your device, encrypted.
 
 > **Note:** This is the second generation of CryptexNote, rewritten from scratch with React + Electron. The original Python/Tkinter version is available under the [`1.0` tag](https://github.com/yigitfevzitugrul/CryptexNote/tree/1.0) and on the [Releases](https://github.com/yigitfevzitugrul/CryptexNote/releases) page.
+
+![CryptexNote notes list](docs/screenshots/en-notes-dark.png)
+
+### Screenshots
+
+| Edit mode and mood | Calendar and writing streak |
+|---|---|
+| ![Edit mode](docs/screenshots/en-editor.png) | ![Calendar](docs/screenshots/en-calendar.png) |
+| **Login screen** | |
+| ![Login screen](docs/screenshots/en-login.png) | |
+
+> The notes shown in the screenshots are sample demo content.
 
 ### Features
 
@@ -215,6 +242,7 @@ src/
     i18n.js          Turkish and English strings
   index.css          Design system and styles
 design-system/       Design decisions
+docs/screenshots/    README screenshots
 scripts/             Executable update script
 ```
 
